@@ -1,58 +1,18 @@
+import MovieCard from '@/components/movie/MovieCard';
+import { IMovie } from '@/interfaces/movie';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
-import Image from 'next/image';
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-
-interface MovieAwards {
-  wins: number;
-  nominations: number;
-  text: string;
-}
-
-interface MovieIMD {
-  rating: number;
-  votes: number;
-  id: number;
-}
-
-interface MovieTomatoes {
-  viewer: {
-    rating: number;
-    numReviews: number;
-    meter: number;
-  };
-  lastUpdated: Date;
-}
-
-export interface IMovie {
-  _id: string;
-  poster?: string;
-  plot: string;
-  genres: string[];
-  runtime: number;
-  cast: string[];
-  num_mflix_comments: number;
-  title: string;
-  fullplot: string;
-  countries: string[];
-  released: Date;
-  directors: string[];
-  rated: string;
-  awards: MovieAwards;
-  lastupdated: Date;
-  year: number;
-  imdb: MovieIMD;
-  type: string;
-  tomatoes: MovieTomatoes;
-}
+import { useRouter } from 'next/router';
+import React, { useEffect, useState } from 'react';
 
 interface HomeProps {
   movies: IMovie[];
 }
 
-export const getServerSideProps: GetServerSideProps<HomeProps> = async () => {
-  const res = await fetch('http://localhost:8000/api/movies?limit=12');
+export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ query }) => {
+  const { ordering = 'released-asc', q = '' } = query;
+
+  const res = await fetch(`http://localhost:8000/api/movies?limit=12&ordering=${ordering}&q=${q}`);
   const data = await res.json();
 
   return {
@@ -63,16 +23,38 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async () => {
 };
 
 export default function Home({ movies }: HomeProps): JSX.Element {
-  // const [movies, setMovies] = useState<IMovie[]>([]);
-  const placeHolder = 'https://via.placeholder.com/160x230';
+  const router = useRouter();
+  const [search, setSearch] = useState(router.query.q || '');
+  const [currentPage, setCurrentPage] = useState(Number(router.query.page) || 1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  // useEffect(() => {
-  //   fetch('http://localhost:8000/api/movies?limit=12')
-  //     .then((res) => res.json())
-  //     .then((data) => {
-  //       setMovies(data);
-  //     });
-  // }, []);
+  useEffect(() => {
+    fetch('http://localhost:8000/api/movies/count')
+      .then((res) => res.json())
+      .then((data) => {
+        setTotalPages(Math.ceil(data / 12));
+      });
+  }, []);
+
+  const orderingHandler = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    router.push({
+      query: { ...router.query, ordering: e.target.value },
+    });
+  };
+
+  const searchHandler = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (search) {
+      router.push({
+        query: { ...router.query, q: search },
+      });
+    } else {
+      delete router.query.q;
+      router.push({
+        query: router.query,
+      });
+    }
+  };
 
   return (
     <>
@@ -85,29 +67,91 @@ export default function Home({ movies }: HomeProps): JSX.Element {
       <div className="bg-slate-100 min-h-screen">
         <div className="container mx-auto">
           <div className="bg-white">
+            <div className="py-4 px-4 flex items-center gap-4">
+              <select
+                onChange={orderingHandler}
+                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 "
+              >
+                <option value="released-asc">Oldest</option>
+                <option value="released-desc">Newest</option>
+                <option value="imdb-rating-desc">Most popular</option>
+                <option value="title-asc">A-Z</option>
+                <option value="title-desc">Z-A</option>
+              </select>
+
+              <form className="w-full" onSubmit={searchHandler}>
+                <label
+                  htmlFor="default-search"
+                  className="mb-2 text-sm font-medium text-gray-900 sr-only "
+                >
+                  Search
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <svg
+                      aria-hidden="true"
+                      className="w-5 h-5 text-gray-500 dark:text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  </div>
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    type="search"
+                    id="default-search"
+                    className="block w-full p-4 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 "
+                    placeholder="Search by movie title.."
+                  />
+                  <button
+                    type="submit"
+                    className="text-white absolute right-2.5 bottom-2.5 bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 "
+                  >
+                    Search
+                  </button>
+                </div>
+              </form>
+            </div>
+
             <div className="p-4 grid grid-cols-6 gap-4">
               {movies.map((movie) => (
-                <div key={movie._id} className="group">
-                  <div className="aspect-[16/23] relative group">
-                    <Image
-                      src={movie.poster || placeHolder}
-                      alt={movie.title}
-                      width={160}
-                      height={230}
-                      className="w-full h-full object-cover rounded"
-                    />
-                    <div className="absolute inset-0 group-hover:bg-black/30 transition-all" />
-                  </div>
-                  <Link
-                    href={''}
-                    className="text-xs text-stone-800	group-hover:text-sky-300 transition-colors"
-                  >
-                    {movie.title}
-                  </Link>
-                </div>
+                <MovieCard key={movie._id} movie={movie} />
               ))}
             </div>
           </div>
+
+          <nav>
+            <ul className="mt-10 flex -space-x-px">
+              <li>
+                <button
+                  disabled
+                  className="px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg hover:bg-gray-100 hover:text-gray-700 disabled:pointer-events-none disabled:text-gray-300"
+                >
+                  Previous
+                </button>
+              </li>
+              <li>
+                <button className="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:pointer-events-none disabled:text-gray-300 ">
+                  1
+                </button>
+              </li>
+
+              <li>
+                <button className="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg hover:bg-gray-100 hover:text-gray-700 disabled:pointer-events-none disabled:text-gray-300">
+                  Next
+                </button>
+              </li>
+            </ul>
+          </nav>
         </div>
       </div>
     </>
