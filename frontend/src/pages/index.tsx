@@ -1,6 +1,6 @@
 import MovieCard from '@/components/movie/MovieCard';
 import { IMovie } from '@/interfaces/movie';
-import { GetServerSideProps } from 'next';
+import { GetStaticProps } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import React, { useEffect, useState } from 'react';
@@ -9,10 +9,8 @@ interface HomeProps {
   movies: IMovie[];
 }
 
-export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ query }) => {
-  const { ordering = 'released-asc', q = '' } = query;
-
-  const res = await fetch(`http://localhost:8000/api/movies?limit=12&ordering=${ordering}&q=${q}`);
+export const getStaticProps: GetStaticProps<HomeProps> = async () => {
+  const res = await fetch(`http://localhost:8000/api/movies?limit=24`);
   const data = await res.json();
 
   return {
@@ -22,27 +20,34 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ query 
   };
 };
 
-export default function Home({ movies }: HomeProps): JSX.Element {
+export default function Home({ movies: data }: HomeProps): JSX.Element {
   const router = useRouter();
   const [search, setSearch] = useState(router.query.q || '');
-  const [currentPage, setCurrentPage] = useState(Number(router.query.page) || 1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [movies, setMovies] = useState<IMovie[]>(data);
+  const [ordering, setOrdering] = useState(router.query.ordering || 'released-asc');
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/movies/count')
+    setSearch(router.query.q || '');
+    setOrdering(router.query.ordering || 'released-asc');
+
+    fetch(
+      `http://localhost:8000/api/movies?limit=24&ordering=${router.query.ordering}&q=${
+        router.query.q || ''
+      }`
+    )
       .then((res) => res.json())
       .then((data) => {
-        setTotalPages(Math.ceil(data / 12));
+        setMovies(data);
       });
-  }, []);
+  }, [router.query]);
 
-  const orderingHandler = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const orderingHandler = (e: React.ChangeEvent<HTMLSelectElement>): void => {
     router.push({
       query: { ...router.query, ordering: e.target.value },
     });
   };
 
-  const searchHandler = (e: React.FormEvent<HTMLFormElement>) => {
+  const searchHandler = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
     if (search) {
       router.push({
@@ -69,6 +74,7 @@ export default function Home({ movies }: HomeProps): JSX.Element {
           <div className="bg-white">
             <div className="py-4 px-4 flex items-center gap-4">
               <select
+                value={ordering}
                 onChange={orderingHandler}
                 className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 "
               >
@@ -106,7 +112,7 @@ export default function Home({ movies }: HomeProps): JSX.Element {
                   </div>
                   <input
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e): void => setSearch(e.target.value)}
                     type="search"
                     id="default-search"
                     className="block w-full p-4 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 "
