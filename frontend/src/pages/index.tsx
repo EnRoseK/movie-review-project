@@ -1,16 +1,22 @@
 import MovieCard from '@/components/movie/MovieCard';
+import { MovieCardSkelton } from '@/components/movie/MovieCardSkeleton';
+import useLoader from '@/hooks/useLoader';
 import { IMovie } from '@/interfaces/movie';
-import { GetStaticProps } from 'next';
+import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 
 interface HomeProps {
   movies: IMovie[];
 }
 
-export const getStaticProps: GetStaticProps<HomeProps> = async () => {
-  const res = await fetch(`http://localhost:8000/api/movies?limit=24`);
+export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ query }) => {
+  const { ordering = '', q = '', limit = '24' } = query;
+
+  const res = await fetch(
+    `http://localhost:8000/api/movies?limit=${limit}&ordering=${ordering}&q=${q}`
+  );
   const data = await res.json();
 
   return {
@@ -20,26 +26,10 @@ export const getStaticProps: GetStaticProps<HomeProps> = async () => {
   };
 };
 
-export default function Home({ movies: data }: HomeProps): JSX.Element {
+export default function Home({ movies }: HomeProps): JSX.Element {
   const router = useRouter();
-  const [search, setSearch] = useState(router.query.q || '');
-  const [movies, setMovies] = useState<IMovie[]>(data);
-  const [ordering, setOrdering] = useState(router.query.ordering || 'released-asc');
-
-  useEffect(() => {
-    setSearch(router.query.q || '');
-    setOrdering(router.query.ordering || 'released-asc');
-
-    fetch(
-      `http://localhost:8000/api/movies?limit=24&ordering=${router.query.ordering}&q=${
-        router.query.q || ''
-      }`
-    )
-      .then((res) => res.json())
-      .then((data) => {
-        setMovies(data);
-      });
-  }, [router.query]);
+  const { ordering = '', q = '', limit = 24 } = router.query;
+  const [search, setSearch] = useState(q);
 
   const orderingHandler = (e: React.ChangeEvent<HTMLSelectElement>): void => {
     router.push({
@@ -112,7 +102,9 @@ export default function Home({ movies: data }: HomeProps): JSX.Element {
                   </div>
                   <input
                     value={search}
-                    onChange={(e): void => setSearch(e.target.value)}
+                    onChange={(e): void => {
+                      setSearch(e.target.value);
+                    }}
                     type="search"
                     id="default-search"
                     className="block w-full p-4 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 "
@@ -130,7 +122,7 @@ export default function Home({ movies: data }: HomeProps): JSX.Element {
 
             <div className="p-4 grid grid-cols-6 gap-4">
               {movies.map((movie) => (
-                <MovieCard key={movie._id} movie={movie} />
+                <MovieCard movie={movie} key={movie._id} />
               ))}
             </div>
           </div>
